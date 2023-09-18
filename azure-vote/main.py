@@ -85,42 +85,33 @@ if not r.get(button2): r.set(button2,0)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-
-    if request.method == 'GET':
-
-        # Get current values
-        vote1 = r.get(button1).decode('utf-8')
-        tracer.span(name="Cats Vote")
-        vote2 = r.get(button2).decode('utf-8')
-        tracer.span(name="Dogs Vote")
-
-        # Return index with values
-        return render_template("index.html", value1=int(vote1), value2=int(vote2), button1=button1, button2=button2, title=title)
-
-    elif request.method == 'POST':
-
-        if request.form['vote'] == 'reset':
-
-            # Empty table and return results
-            r.set(button1,0)
-            r.set(button2,0)
-            vote1 = r.get(button1).decode('utf-8')
-            vote2 = r.get(button2).decode('utf-8')
+    with tracer.span(name="index") as span:  # Trace the index function
+        if request.method == 'GET':
+            with tracer.span(name="get_votes"):  # Trace the GET method operations
+                vote1 = r.get(button1).decode('utf-8')
+                vote2 = r.get(button2).decode('utf-8')
             return render_template("index.html", value1=int(vote1), value2=int(vote2), button1=button1, button2=button2, title=title)
+        
+        elif request.method == 'POST':
+            with tracer.span(name="post_votes"):  # Trace the POST method operations
+                if request.form['vote'] == 'reset':
+                    r.set(button1, 0)
+                    r.set(button2, 0)
+                    vote1 = r.get(button1).decode('utf-8')
+                    vote2 = r.get(button2).decode('utf-8')
+                    
+                    return render_template("index.html", value1=int(vote1), value2=int(vote2), button1=button1, button2=button2, title=title)
+                
+                else:
+                    vote = request.form['vote']
+                    r.incr(vote, 1)
+                    vote1 = r.get(button1).decode('utf-8')
+                    vote2 = r.get(button2).decode('utf-8')
 
-        else:
-            # Insert vote result into DB
-            vote = request.form['vote']
-            r.incr(vote,1)
-
-            # Get current values
-            vote1 = r.get(button1).decode('utf-8')
-            vote2 = r.get(button2).decode('utf-8')
-
-            properties = {'custom_dimensions': {vote: 1}}
-            logger.warning(vote, extra=properties)
-            # Return results
-            return render_template("index.html", value1=int(vote1), value2=int(vote2), button1=button1, button2=button2, title=title)
+                    properties = {'custom_dimensions': {vote: 1}}
+                    logger.warning(vote, extra=properties)
+                    
+                    return render_template("index.html", value1=int(vote1), value2=int(vote2), button1=button1, button2=button2, title=title)
 
 if __name__ == "__main__":
 
